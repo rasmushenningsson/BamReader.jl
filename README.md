@@ -1,2 +1,2 @@
 # BamReader.jl
-Julia implementatin of Bam file reading
+Julia implementation of Bam file reading
