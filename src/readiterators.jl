@@ -1,8 +1,8 @@
-import Base: start, next, done, eltype, print, show, string
+import Base: iterate, eltype, print, show, string
 
 
 
-immutable BamReadChunk
+struct BamReadChunk
 	e::CIGARElement
 	readPos::Int
 	refPos::Int
@@ -24,20 +24,46 @@ print(io::Main.Base.IO, c::BamReadChunk) = print(io, "Chunk: ", c.e, ", readPos:
 
 
 
-immutable BamReadChunkState
+struct BamReadChunkState
 	cig::CIGAR
-	cigIter::Int
+	cigState::Int
 	readPos::Int
 	refPos::Int
 end
+BamReadChunkState(cig::CIGAR) = BamReadChunkState(cig,1,1,pos(r))
 
-# Base.start(r::BamRead) = BamReadChunkState(cigar(r),1,1,pos(r))
-function Base.start(r::BamRead)
-	cig = cigar(r)
-	BamReadChunkState(cig,start(cig),1,pos(r))
-end
-function Base.next(::BamRead, s::BamReadChunkState)
-	(e,cigIter) = next(s.cig,s.cigIter)
+# function Base.start(r::BamRead)
+# 	cig = cigar(r)
+# 	BamReadChunkState(cig,start(cig),1,pos(r))
+# end
+# function Base.next(::BamRead, s::BamReadChunkState)
+# 	(e,cigIter) = next(s.cig,s.cigIter)
+# 	readPos = s.readPos
+# 	refPos = s.refPos
+
+# 	o = op(e)
+# 	l = len(e)
+# 	if o==CIGAR_M || o==CIGAR_S || o==CIGAR_I || o==CIGAR_Eq || o==CIGAR_X
+# 		readPos += l
+# 	end
+
+# 	if o==CIGAR_M || o == CIGAR_D || o==CIGAR_N || o==CIGAR_Eq || o==CIGAR_X
+# 		refPos += l
+# 	end
+# 	# Do nothing for CIGAR_H and CIGAR_P
+
+# 	# TODO: check for unsupported/unknown CIGAR ops
+
+# 	(BamReadChunk(e,s.readPos,s.refPos),BamReadChunkState(s.cig,cigIter,readPos,refPos))
+# end
+# Base.done(::BamRead, s::BamReadChunkState) = done(s.cig,s.cigIter)
+
+
+function iterate(r::BamRead, s::BamReadChunkState=BamReadChunkState(cigar(r)))
+	cigIter = iterate(s.cig, s.cigState)
+	cigIter == nothing && return nothing
+	(e,cigState) = cigIter
+
 	readPos = s.readPos
 	refPos = s.refPos
 
@@ -54,11 +80,10 @@ function Base.next(::BamRead, s::BamReadChunkState)
 
 	# TODO: check for unsupported/unknown CIGAR ops
 
-	(BamReadChunk(e,s.readPos,s.refPos),BamReadChunkState(s.cig,cigIter,readPos,refPos))
+	(BamReadChunk(e,s.readPos,s.refPos),BamReadChunkState(s.cig,cigState,readPos,refPos))
 end
 
-Base.done(::BamRead, s::BamReadChunkState) = done(s.cig,s.cigIter)
-Base.eltype(::Type{BamRead}) = BamReadChunk
+eltype(::BamRead) = BamReadChunk
 
 
 

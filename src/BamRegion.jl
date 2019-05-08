@@ -1,6 +1,6 @@
 import Base: start, next, done, eltype
 
-immutable BamRegion
+struct BamRegion
 	bamFile::BamFile
 	refID::Int # 0-based index, since that is what each read has stored
 	region::UnitRange{Int}
@@ -22,7 +22,7 @@ end
 
 
 # TODO: type or immutable?
-type BamRegionState
+mutable struct BamRegionState
 	refID::Int
 	region::UnitRange{Int}
 	cq::ChunkQueue

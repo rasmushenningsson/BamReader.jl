@@ -1,6 +1,6 @@
 import Base: position, eof, read, readbytes!
 
-type BGZFBlockStream
+mutable struct BGZFBlockStream
 	io::IO # underlying compressed data
 	block::Array{UInt8,1} # current BGZF block
 	#zio # TODO: set type?

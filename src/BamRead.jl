@@ -1,4 +1,4 @@
-import Base: copy, start, next, done, eltype, size, length, getindex, checkbounds, print, show, string, view
+import Base: copy, iterate, eltype, size, length, getindex, checkbounds, print, show, string, view
 
 
 const INITIAL_READ_SIZE = 1024
@@ -7,7 +7,7 @@ const MAX_READ_SIZE     = 16*1024*1024
 @assert MAX_READ_SIZE%INITIAL_READ_SIZE==0 && ispow2(div(MAX_READ_SIZE,INITIAL_READ_SIZE)) "MAX_READ_SIZE should be a power of two multiple of INITIAL_READ_SIZE"
 
 
-immutable Tag
+struct Tag
 	t::UInt16 # two-character representation
 end
 Tag(a, b) = Tag(UInt16(a)&0xff | (UInt16(b)<<8))
@@ -27,7 +27,7 @@ show(io::IO,tag::Tag) = print(io,tag)
 
 
 
-type BamRead
+mutable struct BamRead
 	file::BamFile # file containing the read
 
 	# fields of known size
@@ -60,7 +60,7 @@ end
 #BamRead() = BamRead(0,0,0,0,0,0,0,0,0,Array{UInt8,1}(INITIAL_READ_SIZE),-1,-1)
 #BamRead() = BamRead(0,0,0,0,0,0,0,0,0,Array{UInt8,1}(INITIAL_READ_SIZE),-1,-1,false,Dict{UInt16,Int}())
 # BamRead(f::BamFile) = BamRead(f,0,0,0,0,0,0,0,0,0,Array{UInt8,1}(INITIAL_READ_SIZE),-1,-1,false,Dict{UInt16,Int}())
-BamRead(f::BamFile) = BamRead(f,0,0,0,0,0,0,0,0,0,Array{UInt8,1}(INITIAL_READ_SIZE),-1,-1,0,Array{Tuple{Tag,Int},1}())
+BamRead(f::BamFile) = BamRead(f,0,0,0,0,0,0,0,0,0,zeros(UInt8,INITIAL_READ_SIZE),-1,-1,0,Tuple{Tag,Int}[])
 
 
 block_size(r::BamRead) = Int(r.block_size)
@@ -157,10 +157,11 @@ end
 # CIGAR and Seq needs to be (immutable) types rather than simple arrays so that we can interpret them for the user
 
 # TODO: should CIGAR be a subtype of AbstractArray???
-immutable CIGAR
+struct CIGAR{T<:AbstractArray{UInt8}}
 	# TODO: Probably make the array type a type parameter. 
 	# This way, it also makes sure we don't need to wrap the array into a subarray when it's not necessary.
-	buf::SubArray{UInt8,1,Array{UInt8,1},Tuple{UnitRange{Int}},true}
+	# buf::SubArray{UInt8,1,Array{UInt8,1},Tuple{UnitRange{Int}},true}
+	buf::T
 end
 
 # allow user to construct CIGAR from CIGAR string
@@ -171,16 +172,16 @@ function CIGAR(str::AbstractString)
 	# end
 
 	# compute cigar length and preallocate array
-	cigarLength = length(str) - mapreduce(isnumber,+,str)
-	buf = Array{UInt32,1}(cigarLength)
+	cigarLength = length(str) - mapreduce(isnumeric,+,str)
+	buf = zeros(UInt32,cigarLength)
 
 	# now interpret cigar string
 	len = 0
-	const ops = Dict([('M',CIGAR_M), ('I',CIGAR_I), ('D',CIGAR_D), ('N',CIGAR_N), ('S',CIGAR_S), ('H',CIGAR_H), ('P',CIGAR_P), ('=',CIGAR_Eq), ('X',CIGAR_X)])
+	ops = Dict([('M',CIGAR_M), ('I',CIGAR_I), ('D',CIGAR_D), ('N',CIGAR_N), ('S',CIGAR_S), ('H',CIGAR_H), ('P',CIGAR_P), ('=',CIGAR_Eq), ('X',CIGAR_X)])
 
 	i = 1
 	for c in str
-		if isnumber(c)
+		if isnumeric(c)
 			len = len*10 + (c-'0')
 			continue
 		end
@@ -193,12 +194,12 @@ function CIGAR(str::AbstractString)
 end
 
 
-immutable SeqElement
+struct SeqElement
 	e::Int
 end
 
 # TODO: should Seq be a subtype of AbstractArray???
-immutable Seq <: AbstractArray{SeqElement,1}
+struct Seq <: AbstractArray{SeqElement,1}
 	#buf::SubArray{UInt8,1,Array{UInt8,1},Tuple{UnitRange{Int}},1}
 	buf::Array{UInt8,1} # the entire buffer with the read (same as BamRead.buf)
 	#start::Int          # offset into read buffer - TODO: change to half-bytes to allow substrings???
@@ -208,7 +209,8 @@ end
 
 
 # access to variable length fields
-read_name(r::BamRead) = SubString(String(r.buf), 1, l_read_name(r)-1)
+# read_name(r::BamRead) = SubString(String(r.buf), 1, l_read_name(r)-1)
+read_name(r::BamRead) = String(r.buf[1:l_read_name(r)-1])
 cigar(r::BamRead)     = (s=l_read_name(r)+1; CIGAR(view(r.buf, s:s+n_cigar_op(r)*4-1)))
 seq(r::BamRead)       = Seq(r.buf, (r.seq_start-1)*2, l_seq(r))
 qual(r::BamRead)      = view(r.buf, r.qual_start:r.qual_start+l_seq(r)-1)
@@ -232,7 +234,7 @@ copy(s::Seq)   = Seq(copy(view(s.buf,s.start>>1+1:(s.start+s.len+1)>>1)), mod(s.
 
 
 
-immutable CIGARElement
+struct CIGARElement
 	e::UInt32
 end
 CIGARElement(c::CIGAR,i::Int) = CIGARElement((UInt32(c.buf[i])) | (UInt32(c.buf[i+1])<<8) | (UInt32(c.buf[i+2])<<16) | (UInt32(c.buf[i+3])<<24))
@@ -249,12 +251,15 @@ print(io::IO,e::CIGARElement) = print(io,len(e),op_char(e))
 
 # CIGAR iterators
 # Iterators
-start(::CIGAR) = 1
-next(c::CIGAR, i::Int) = (CIGARElement(c,i), i+4)
-done(c::CIGAR, i::Int) = i > length(c.buf)
-eltype(::Type{CIGAR}) = CIGARElement
+# start(::CIGAR) = 1
+# next(c::CIGAR, i::Int) = (CIGARElement(c,i), i+4)
+# done(c::CIGAR, i::Int) = i > length(c.buf)
 
-
+function iterate(c::CIGAR, i::Int=1)
+	i>length(c.buf) && return nothing
+	(CIGARElement(c,i), i+4)
+end
+eltype(::CIGAR) = CIGARElement
 length(c::CIGAR) = div(length(c.buf),4)
 
 
@@ -290,10 +295,14 @@ base_char(e::SeqElement) = base_chars[e.e+1] # TODO: should this be renamed, ret
 
 
 # Iterators
-start(::Seq) = 1
-next(s::Seq, i::Int) = (SeqElement(s,i+s.start), i+1)
-done(s::Seq, i::Int) = i > s.len
-eltype(::Type{Seq}) = SeqElement
+# start(::Seq) = 1
+# next(s::Seq, i::Int) = (SeqElement(s,i+s.start), i+1)
+# done(s::Seq, i::Int) = i > s.len
+function iterate(s::Seq, i::Int=1)
+	i > s.len && return nothing
+	(SeqElement(s,i+s.start), i+1)
+end
+eltype(::Seq) = SeqElement
 
 
 
@@ -348,7 +357,7 @@ function print(io::IO,seq::Seq)
 end
 show(io::IO,seq::Seq) = print(io,seq)
 function string(seq::Seq)
-	str = Array{UInt8,1}(seq.len) # allocate buffer
+	str = zeros(UInt8,seq.len) # allocate buffer
 	for (i,n) in enumerate(seq)
 		str[i] = base_char(n)
 	end
@@ -492,7 +501,8 @@ function tagstring(r::BamRead, tag::Tag)
 	end
 	offs -= 1 # do not include NULL terminator
 	
-	SubString(String(r.buf),start,offs)
+	# SubString(String(r.buf),start,offs)
+	String(r.buf[start:offs])
 end
 tagstring(r::BamRead, tag::String) = tagstring(r, Tag(tag))
 
@@ -677,7 +687,7 @@ function print(io::IO, r::BamRead)
 	print(io, next_pos(r), '\t')
 	print(io, tlen(r), '\t')
 	print(io, seq(r), '\t')
-	print(io, String(qual(r)+0x21)) # NO tab, will be added by tag printing if necessary
+	print(io, String(qual(r).+0x21)) # NO tab, will be added by tag printing if necessary
 	
 	printtags(io, r)
 end

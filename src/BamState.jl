@@ -1,6 +1,8 @@
+import Base: iterate, eltype
+
 # very simple implementation of iterating through all the reads of a BAM file
 
-immutable BamState
+struct BamState
 	io::IO
 	zio::IO
 	read::BamRead
@@ -16,7 +18,13 @@ BamState(f::BamFile) = BamState(f,open(f.filename))
 
 
 
-Base.start(f::BamFile) = BamState(f)
-Base.next(::BamFile, s::BamState) = (nextread!(s.zio, s.read), s)
-Base.done(::BamFile, s::BamState) = eof(s.zio)
-Base.eltype(::Type{BamFile}) = BamRead
+# Base.start(f::BamFile) = BamState(f)
+# Base.next(::BamFile, s::BamState) = (nextread!(s.zio, s.read), s)
+# Base.done(::BamFile, s::BamState) = eof(s.zio)
+
+
+function iterate(f::BamFile, s::BamState=BamState(f))
+	eof(s.zio) && return nothing
+	(nextread!(s.zio, s.read), s)
+end
+Base.eltype(::BamFile) = BamRead

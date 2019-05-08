@@ -82,9 +82,7 @@ end
 
 
 
-# TODO: shoule VirtualOffset be a typealias or its own type?
-# typealias VirtualOffset UInt64
-immutable VirtualOffset
+struct VirtualOffset
 	o::UInt64
 end
 function VirtualOffset(coffset::Integer, uoffset::Integer)
@@ -113,7 +111,7 @@ show(io::IO, v::VirtualOffset) = print(io,v)
 
 
 
-immutable Chunk
+struct Chunk
 	s::VirtualOffset # start
 	e::VirtualOffset # end
 end
@@ -133,15 +131,15 @@ end
 show(io::IO, chunk::Chunk) = print(io,chunk)
 
 
-type Bin
+mutable struct Bin
 	bin::UInt # distinct bin - TODO: remove? store as key in Bin Dict only.
-	chunks::Array{Chunk,1}
+	chunks::Vector{Chunk}
 end
 function Bin(is::IO)
 	bin = UInt( read(is,UInt32) )
 
 	nChunks = Int(read(is,Int32))
-	chunks = Array{Chunk,1}(nChunks)
+	chunks = Vector{Chunk}(undef,nChunks)
 
 	for i=1:nChunks
 		chunks[i] = Chunk(is)
@@ -157,7 +155,7 @@ show(io::IO, bin::Bin) = print(io,bin)
 
 
 # BamIndex for a single reference
-type BamIndexRef
+mutable struct BamIndexRef
 	#bins::Array{Bin,1} # TODO: change to Dict mapping distinct bin to chunk list?
 	bins::Dict{Int,Bin}
 	linearIndex::Array{VirtualOffset,1}
@@ -175,13 +173,13 @@ function BamIndexRef(is::IO)
 	end
 
 	nIntervals = Int(read(is,Int32))
-	linearIndex = reinterpret(VirtualOffset, read(is,UInt64,nIntervals))
+	linearIndex = reinterpret(VirtualOffset, read!(is,Vector{UInt64}(undef,nIntervals)))
 
 	BamIndexRef(bins,linearIndex)
 end
 
 
-type BamIndex
+mutable struct BamIndex
 	refs::Array{BamIndexRef,1}
 	nbrNoCooord::UInt64
 end
@@ -190,13 +188,13 @@ BamIndex() = BamIndex(Array{BamIndexRef,1}(),0) # empty bam index
 isempty(index::BamIndex) = length(index.refs)==0 && index.nbrNoCooord==0
 
 function BamIndex(is::IO)
-	const magic = UInt32('B') | UInt32('A')<<8 | UInt32('I')<<16 | UInt32(1)<<24
+	magic = UInt32('B') | UInt32('A')<<8 | UInt32('I')<<16 | UInt32(1)<<24
 	magicRead = read(is,UInt32)
 
 	@assert magicRead == magic "Corrupt BAI file, magic string doesn't match."
 
 	nRef = Int(read(is,Int32))
-	refs = Array{BamIndexRef,1}(nRef)
+	refs = Vector{BamIndexRef}(undef,nRef)
 
 	for i=1:nRef
 		refs[i] = BamIndexRef(is)
@@ -232,7 +230,7 @@ end
 
 
 
-type ChunkQueueSingle
+mutable struct ChunkQueueSingle
 	index::BamIndexRef
 	binRange::UnitRange{Int}
 	currBin::Int
@@ -269,7 +267,7 @@ end
 
 
 
-type ChunkQueue
+mutable struct ChunkQueue
 	queues::Array{ChunkQueueSingle,1}
 	pq::PriorityQueue{Int,Chunk} # bin level -> Chunk (the bin level is the index in array of single queues)
 

@@ -5,14 +5,16 @@ function read_bam_header(io::IO)
 	magic != 0x014d4142 && error("BAM magic string not found")
 
 	l_text = read(io,Int32)
-	text = String(read(io,UInt8,l_text))
+	# text = String(read(io,UInt8,l_text))
+	text = String(read!(io,Vector{UInt8}(undef,l_text)))
 	n_ref = read(io,Int32)
 
-	refs = Array{Tuple{String,Int},1}(n_ref)
+	refs = Vector{Tuple{String,Int}}(undef,n_ref)
 
 	for i=1:n_ref
 		l_name = read(io,Int32)
-		name = read(io,UInt8,l_name)
+		# name = read(io,UInt8,l_name)
+		name = read!(io,Vector{UInt8}(undef,l_name))
 		l_ref = read(io,Int32)
 		refs[i] = (String(name[1:end-1]),l_ref)
 	end
@@ -32,23 +34,23 @@ function skip_bam_header(io::IO)
 	magic != 0x014d4142 && error("BAM magic string not found")
 
 	l_text = read(io,Int32)
-	text = read(io,UInt8,l_text)
+	text = read!(io,Vector{UInt8}(undef,l_text))
 	n_ref = read(io,Int32)
 
 	for i=1:n_ref
 		l_name = read(io,Int32)
-		name = read(io,UInt8,l_name)
+		name = read!(io,Vector{UInt8}(undef,l_name))
 		l_ref = read(io,Int32)
 	end
 end
 
 
-type BamFile
+mutable struct BamFile
 	filename::AbstractString
 
 	# header
 	text::String
-	refs::Array{Tuple{String,Int},1}
+	refs::Vector{Tuple{String,Int}}
 
 	# index
 	index::BamIndex
