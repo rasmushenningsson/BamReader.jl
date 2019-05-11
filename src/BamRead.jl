@@ -259,7 +259,7 @@ function iterate(c::CIGAR, i::Int=1)
 	i>length(c.buf) && return nothing
 	(CIGARElement(c,i), i+4)
 end
-eltype(::CIGAR) = CIGARElement
+eltype(::Type{T}) where {T<:CIGAR} = CIGARElement
 length(c::CIGAR) = div(length(c.buf),4)
 
 
@@ -302,7 +302,7 @@ function iterate(s::Seq, i::Int=1)
 	i > s.len && return nothing
 	(SeqElement(s,i+s.start), i+1)
 end
-eltype(::Seq) = SeqElement
+eltype(::Type{Seq}) = SeqElement
 
 
 
