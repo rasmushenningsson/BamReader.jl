@@ -83,7 +83,7 @@ function iterate(r::BamRead, s::BamReadChunkState=BamReadChunkState(cigar(r)))
 	(BamReadChunk(e,s.readPos,s.refPos),BamReadChunkState(s.cig,cigState,readPos,refPos))
 end
 
-eltype(::BamRead) = BamReadChunk
+eltype(::Type{BamRead}) = BamReadChunk
 
 
 

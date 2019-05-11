@@ -27,4 +27,4 @@ function iterate(f::BamFile, s::BamState=BamState(f))
 	eof(s.zio) && return nothing
 	(nextread!(s.zio, s.read), s)
 end
-Base.eltype(::BamFile) = BamRead
+Base.eltype(::Type{BamFile}) = BamRead
