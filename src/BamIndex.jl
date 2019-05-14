@@ -1,5 +1,3 @@
-import Base: show, print, seek, +, isless, isempty, shift!
-
 
 # Input, 1-based, closed interval
 # returned bin index is 0-based!!!

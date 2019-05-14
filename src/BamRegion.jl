@@ -1,5 +1,3 @@
-import Base: start, next, done, eltype
-
 struct BamRegion
 	bamFile::BamFile
 	refID::Int # 0-based index, since that is what each read has stored
@@ -64,7 +62,7 @@ end
 
 
 
-start(reg::BamRegion) = BamRegionState(reg)
+# start(reg::BamRegion) = BamRegionState(reg)
 
 function nextimpl(bamFile::BamFile, s::BamRegionState)
 	
@@ -126,13 +124,23 @@ function nextimpl(bamFile::BamFile, s::BamRegionState)
 end
 
 
-function next(reg::BamRegion, s::BamRegionState)
+# function next(reg::BamRegion, s::BamRegionState)
+# 	s.currRead,s.nextRead = s.nextRead,s.currRead # swap
+# 	nextimpl(reg.bamFile, s)
+# 	(s.currRead, s)
+# end
+
+# done(::BamRegion, s::BamRegionState) = s.isdone
+
+
+function iterate(reg::BamRegion, s::BamRegionState=BamRegionState(reg))
+	s.isdone && return nothing
+
 	s.currRead,s.nextRead = s.nextRead,s.currRead # swap
 	nextimpl(reg.bamFile, s)
 	(s.currRead, s)
 end
 
-done(::BamRegion, s::BamRegionState) = s.isdone
 
 eltype(::Type{BamRegion}) = BamRead
 

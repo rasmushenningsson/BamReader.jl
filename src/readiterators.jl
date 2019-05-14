@@ -1,7 +1,3 @@
-import Base: iterate, eltype, print, show, string
-
-
-
 struct BamReadChunk
 	e::CIGARElement
 	readPos::Int

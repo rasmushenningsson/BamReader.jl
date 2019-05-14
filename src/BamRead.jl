@@ -1,5 +1,3 @@
-import Base: copy, iterate, eltype, size, length, getindex, checkbounds, print, show, string, view
-
 
 const INITIAL_READ_SIZE = 1024
 const MAX_READ_SIZE     = 16*1024*1024

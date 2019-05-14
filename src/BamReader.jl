@@ -4,6 +4,11 @@ using DataStructures
 using Libz
 using BufferedStreams
 
+import Base: show, print, seek, +, isless, isempty, copy, iterate, eltype, size, length,
+             getindex, checkbounds, string, view, position, eof, read, readbytes!
+
+
+
 export 
 	BamFile,
 	BamRead,
