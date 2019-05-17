@@ -1,5 +1,3 @@
-import Base: position, eof, read, readbytes!
-
 mutable struct BGZFBlockStream
 	io::IO # underlying compressed data
 	block::Array{UInt8,1} # current BGZF block
