@@ -1,5 +1,3 @@
-import Base: iterate, eltype
-
 # very simple implementation of iterating through all the reads of a BAM file
 
 struct BamState
